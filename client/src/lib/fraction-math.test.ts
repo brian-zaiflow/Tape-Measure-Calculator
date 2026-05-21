@@ -173,23 +173,11 @@ describe('parseInput', () => {
     expect(parseInput('10 3/4"')).toEqual({ inches: 10, numerator: 3, denominator: 4 });
   });
 
-  it('parses feet notation (feet only)', () => {
-    expect(parseInput("5'")).toEqual({ inches: 60, numerator: 0, denominator: 1 });
-    expect(parseInput("2'")).toEqual({ inches: 24, numerator: 0, denominator: 1 });
-  });
-
-  it('parses feet and inches notation', () => {
-    expect(parseInput('5\' 3"')).toEqual({ inches: 63, numerator: 0, denominator: 1 });
-    expect(parseInput('2\' 6"')).toEqual({ inches: 30, numerator: 0, denominator: 1 });
-  });
-
-  it('parses feet, inches, and fractions notation', () => {
-    expect(parseInput('5\' 3 1/2"')).toEqual({ inches: 63, numerator: 1, denominator: 2 });
-    expect(parseInput('2\' 6 3/4"')).toEqual({ inches: 30, numerator: 3, denominator: 4 });
-  });
-
-  it('parses feet and fractions notation', () => {
-    expect(parseInput('5\' 1/2"')).toEqual({ inches: 60, numerator: 1, denominator: 2 });
+  it('rejects feet notation', () => {
+    expect(parseInput("5'")).toBeNull();
+    expect(parseInput('5\' 3"')).toBeNull();
+    expect(parseInput('5\' 3 1/2"')).toBeNull();
+    expect(parseInput('5\' 1/2"')).toBeNull();
   });
 
   it('reduces fractions during parsing', () => {

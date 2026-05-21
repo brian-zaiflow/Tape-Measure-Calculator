@@ -3,10 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Link } from "wouter";
-import { ArrowLeft, ChevronDown, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import type { ImperialMeasurement } from "@/types";
 import {
   parseInput,
@@ -15,265 +14,110 @@ import {
   toImperialMeasurement,
 } from "@/lib/fraction-math";
 
-type Mode = "fastener" | "divide" | "exact";
-
 export default function Intervals() {
-  const [mode, setMode] = useState<Mode>("fastener");
-
-  // Fastener Spacing mode
-  const [spacing, setSpacing] = useState("8\"");
   const [boardLength, setBoardLength] = useState("");
-  const [startOffset, setStartOffset] = useState("1\"");
-  const [endOffset, setEndOffset] = useState("1\"");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // Divide mode
-  const [totalLength, setTotalLength] = useState("");
-  const [numSections, setNumSections] = useState("");
-  const [divideOffset, setDivideOffset] = useState("");
-
-  // Exact Count mode
-  const [exactBoardLength, setExactBoardLength] = useState("");
-  const [exactOffset, setExactOffset] = useState("4\"");
-  const [exactNumScrews, setExactNumScrews] = useState("");
+  const [edgeOffset, setEdgeOffset] = useState("2\"");
+  const [itemCount, setItemCount] = useState("");
 
   const [marks, setMarks] = useState<ImperialMeasurement[]>([]);
   const [summary, setSummary] = useState({
     count: 0,
-    actualSpacing: 0,
-    desiredSpacing: 0,
-    unusedLength: 0,
+    spacing: 0,
     span: 0,
     hasWarning: false,
-    warningMessage: ""
+    warningMessage: "",
   });
 
-  // Auto-calculate when inputs change
   useEffect(() => {
     calculateMarks();
-  }, [mode, spacing, boardLength, startOffset, endOffset, totalLength, numSections, divideOffset, exactBoardLength, exactOffset, exactNumScrews]);
+  }, [boardLength, edgeOffset, itemCount]);
 
   const calculateMarks = () => {
-    const newMarks: ImperialMeasurement[] = [];
-    let newSummary = {
+    const emptySummary = {
       count: 0,
-      actualSpacing: 0,
-      desiredSpacing: 0,
-      unusedLength: 0,
+      spacing: 0,
       span: 0,
       hasWarning: false,
-      warningMessage: ""
+      warningMessage: "",
     };
 
-    if (mode === "fastener") {
-      // Fastener Spacing mode: place fasteners at regular intervals
-      const spacingParsed = parseInput(spacing);
-      const boardParsed = boardLength ? parseInput(boardLength) : null;
-      const startParsed = parseInput(startOffset);
-      const endParsed = parseInput(endOffset);
+    const boardParsed = parseInput(boardLength);
+    const offsetParsed = parseInput(edgeOffset);
+    const count = parseInt(itemCount);
 
-      if (!spacingParsed || !boardParsed || !startParsed || !endParsed) {
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
+    if (!boardParsed || !offsetParsed || !count) {
+      setMarks([]);
+      setSummary(emptySummary);
+      return;
+    }
 
-      const spacingInches = toDecimalInches(spacingParsed);
-      const boardInches = toDecimalInches(boardParsed);
-      const startInches = toDecimalInches(startParsed);
-      const endInches = toDecimalInches(endParsed);
+    const boardInches = toDecimalInches(boardParsed);
+    const offsetInches = toDecimalInches(offsetParsed);
 
-      if (spacingInches <= 0 || boardInches <= 0 || startInches < 0 || endInches < 0) {
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
+    if (boardInches <= 0 || offsetInches < 0) {
+      setMarks([]);
+      setSummary(emptySummary);
+      return;
+    }
 
-      // Calculate available length for fasteners
-      const availableLength = boardInches - startInches - endInches;
+    if (count < 2) {
+      setMarks([]);
+      setSummary({
+        ...emptySummary,
+        hasWarning: true,
+        warningMessage: "Enter at least 2 items to calculate even spacing.",
+      });
+      return;
+    }
 
-      if (availableLength <= 0) {
-        newSummary.hasWarning = true;
-        newSummary.warningMessage = "Offsets are too large for board length";
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
+    if (offsetInches * 2 >= boardInches) {
+      setMarks([]);
+      setSummary({
+        ...emptySummary,
+        hasWarning: true,
+        warningMessage: "Edge offset is too large. It must be less than half the total length.",
+      });
+      return;
+    }
 
-      // Calculate number of intervals and actual spacing
-      const numIntervals = Math.floor(availableLength / spacingInches);
-      const numFasteners = numIntervals + 1; // Including first position
+    const firstPosition = offsetInches;
+    const lastPosition = boardInches - offsetInches;
+    const span = lastPosition - firstPosition;
+    const spacing = span / (count - 1);
 
-      // Generate positions
-      let currentPosition = startInches;
-      for (let i = 0; i < numFasteners; i++) {
-        newMarks.push(toImperialMeasurement(currentPosition));
-        currentPosition += spacingInches;
-      }
-
-      // Calculate unused length
-      const lastPosition = startInches + (numIntervals * spacingInches);
-      const unusedLength = boardInches - lastPosition - endInches;
-
-      newSummary = {
-        count: numFasteners,
-        actualSpacing: spacingInches,
-        desiredSpacing: spacingInches,
-        unusedLength: Math.max(0, unusedLength),
-        span: lastPosition - startInches,
-        hasWarning: false,
-        warningMessage: ""
-      };
-
-      // Add warnings
-      if (unusedLength < 0) {
-        newSummary.hasWarning = true;
-        newSummary.warningMessage = `Last fastener extends ${Math.abs(unusedLength).toFixed(2)}" beyond board`;
-      } else if (unusedLength > spacingInches * 0.75) {
-        newSummary.hasWarning = true;
-        newSummary.warningMessage = `${unusedLength.toFixed(2)}" unused - consider adding one more fastener`;
-      }
-
-    } else if (mode === "exact") {
-      // Exact Count mode: place exact number of screws with calculated spacing
-      const boardParsed = parseInput(exactBoardLength);
-      const offsetParsed = parseInput(exactOffset);
-      const numScrews = parseInt(exactNumScrews);
-
-      if (!boardParsed || !offsetParsed || !numScrews || numScrews <= 0) {
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
-
-      const boardInches = toDecimalInches(boardParsed);
-      const offsetInches = toDecimalInches(offsetParsed);
-
-      if (boardInches <= 0 || offsetInches < 0) {
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
-
-      // Validate: offset can't be more than half the board length
-      if (offsetInches * 2 >= boardInches) {
-        newSummary.hasWarning = true;
-        newSummary.warningMessage = "Offset is too large - must be less than half the board length";
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
-
-      // Validate: need at least 2 screws
-      if (numScrews < 2) {
-        newSummary.hasWarning = true;
-        newSummary.warningMessage = "Need at least 2 screws for this mode";
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
-
-      // Calculate positions
-      const firstPosition = offsetInches;
-      const lastPosition = boardInches - offsetInches;
-      const span = lastPosition - firstPosition;
-      const numIntervals = numScrews - 1;
-      const actualSpacing = span / numIntervals;
-
-      // Generate screw positions
-      for (let i = 0; i < numScrews; i++) {
-        const position = firstPosition + (actualSpacing * i);
-        newMarks.push(toImperialMeasurement(position));
-      }
-
-      newSummary = {
-        count: numScrews,
-        actualSpacing: actualSpacing,
-        desiredSpacing: actualSpacing,
-        unusedLength: 0,
-        span: span,
-        hasWarning: false,
-        warningMessage: ""
-      };
-
-    } else {
-      // Divide mode: divide length into equal sections
-      const totalParsed = parseInput(totalLength);
-      const sectionsNum = parseInt(numSections);
-      const offsetParsed = divideOffset ? parseInput(divideOffset) : null;
-
-      if (!totalParsed || !sectionsNum || sectionsNum <= 0) {
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
-
-      const totalInches = toDecimalInches(totalParsed);
-      const offsetInches = offsetParsed ? toDecimalInches(offsetParsed) : 0;
-      const availableLength = totalInches - offsetInches;
-
-      if (availableLength <= 0) {
-        setMarks([]);
-        setSummary(newSummary);
-        return;
-      }
-
-      const sectionSize = availableLength / sectionsNum;
-
-      // Generate cut marks (N-1 marks for N sections)
-      for (let i = 1; i <= sectionsNum; i++) {
-        const markPosition = offsetInches + (sectionSize * i);
-        if (markPosition <= totalInches) {
-          newMarks.push(toImperialMeasurement(markPosition));
-        }
-      }
-
-      newSummary = {
-        count: newMarks.length,
-        actualSpacing: sectionSize,
-        desiredSpacing: sectionSize,
-        unusedLength: 0,
-        span: availableLength,
-        hasWarning: false,
-        warningMessage: ""
-      };
+    const newMarks: ImperialMeasurement[] = [];
+    for (let i = 0; i < count; i++) {
+      const position = firstPosition + spacing * i;
+      newMarks.push(toImperialMeasurement(position));
     }
 
     setMarks(newMarks);
-    setSummary(newSummary);
-  };
-
-  const handlePreset = (presetSpacing: string) => {
-    setSpacing(presetSpacing);
+    setSummary({
+      count,
+      spacing,
+      span,
+      hasWarning: false,
+      warningMessage: "",
+    });
   };
 
   const clearAll = () => {
-    setSpacing("8\"");
     setBoardLength("");
-    setStartOffset("1\"");
-    setEndOffset("1\"");
-    setTotalLength("");
-    setNumSections("");
-    setDivideOffset("");
-    setExactBoardLength("");
-    setExactOffset("4\"");
-    setExactNumScrews("");
+    setEdgeOffset("2\"");
+    setItemCount("");
     setMarks([]);
     setSummary({
       count: 0,
-      actualSpacing: 0,
-      desiredSpacing: 0,
-      unusedLength: 0,
+      spacing: 0,
       span: 0,
       hasWarning: false,
-      warningMessage: ""
+      warningMessage: "",
     });
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <Link href="/">
@@ -285,224 +129,78 @@ export default function Intervals() {
             <ThemeToggle />
           </div>
           <h1 className="text-2xl font-semibold text-foreground mb-1 text-center">
-            Fastener & Interval Calculator
+            Even Spacing Calculator
           </h1>
           <p className="text-sm text-muted-foreground text-center">
-            Place screws at regular intervals, exact counts, or divide lengths evenly
+            Place hooks, screws, brackets, or marks evenly with a matching edge offset
           </p>
         </div>
 
         <Card className="p-6 shadow-xl">
-          {/* Mode Toggle */}
-          <div className="mb-6 flex gap-2">
-            <Button
-              variant={mode === "fastener" ? "default" : "outline"}
-              onClick={() => setMode("fastener")}
-              className="flex-1 transition-all duration-200"
-            >
-              📌 Fastener Spacing
-            </Button>
-            <Button
-              variant={mode === "exact" ? "default" : "outline"}
-              onClick={() => setMode("exact")}
-              className="flex-1 transition-all duration-200"
-            >
-              🎯 Exact Count
-            </Button>
-            <Button
-              variant={mode === "divide" ? "default" : "outline"}
-              onClick={() => setMode("divide")}
-              className="flex-1 transition-all duration-200"
-            >
-              ✂️ Divide Evenly
-            </Button>
+          <div className="space-y-4 mb-6">
+            <div>
+              <Label htmlFor="boardLength" className="text-base font-semibold">
+                Total Length <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="boardLength"
+                value={boardLength}
+                onChange={(e) => setBoardLength(e.target.value)}
+                placeholder={'30 3/8" or 96"'}
+                className="font-mono text-lg mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edgeOffset" className="text-base font-semibold">
+                Distance From Each End <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="edgeOffset"
+                value={edgeOffset}
+                onChange={(e) => setEdgeOffset(e.target.value)}
+                placeholder='2"'
+                className="font-mono text-lg mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                First and last marks will be this far from the ends.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="itemCount" className="text-base font-semibold">
+                Number of Items <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="itemCount"
+                type="number"
+                value={itemCount}
+                onChange={(e) => setItemCount(e.target.value)}
+                placeholder="5"
+                className="text-lg mt-1"
+                min="2"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Use this for hooks, screws, brackets, shelf pins, handles, or layout marks.
+              </p>
+            </div>
           </div>
 
-          {/* Fastener Spacing Mode */}
-          {mode === "fastener" && (
-            <div className="space-y-4 mb-6">
-              {/* Quick Presets */}
-              <div>
-                <Label className="mb-2 block text-xs text-muted-foreground">Quick Presets</Label>
-                <div className="flex gap-2 flex-wrap">
-                  {["16\"", "12\"", "8\"", "6\""].map((preset) => (
-                    <Button
-                      key={preset}
-                      variant={spacing === preset ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePreset(preset)}
-                      className="text-xs"
-                    >
-                      {preset} {preset === "16\"" ? "OC" : preset === "8\"" ? "(Common)" : ""}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Primary Inputs */}
-              <div>
-                <Label htmlFor="spacing" className="text-base font-semibold">
-                  Fastener Spacing <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="spacing"
-                  value={spacing}
-                  onChange={(e) => setSpacing(e.target.value)}
-                  placeholder='8" (most common for drywall)'
-                  className="font-mono text-lg mt-1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="boardLength" className="text-base font-semibold">
-                  Board Length <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="boardLength"
-                  value={boardLength}
-                  onChange={(e) => setBoardLength(e.target.value)}
-                  placeholder={'96" or 8\' or 48 1/2"'}
-                  className="font-mono text-lg mt-1"
-                />
-              </div>
-
-              {/* Advanced Options */}
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="w-full justify-between">
-                    <span className="text-xs">Advanced Options</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 mt-4">
-                  <div>
-                    <Label htmlFor="startOffset" className="text-sm">
-                      Start Offset (from edge)
-                    </Label>
-                    <Input
-                      id="startOffset"
-                      value={startOffset}
-                      onChange={(e) => setStartOffset(e.target.value)}
-                      placeholder='1" (typical edge clearance)'
-                      className="font-mono mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="endOffset" className="text-sm">
-                      End Offset (from edge)
-                    </Label>
-                    <Input
-                      id="endOffset"
-                      value={endOffset}
-                      onChange={(e) => setEndOffset(e.target.value)}
-                      placeholder='1" (typical edge clearance)'
-                      className="font-mono mt-1"
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
-          )}
-
-          {/* Divide Mode */}
-          {mode === "divide" && (
-            <div className="space-y-4 mb-6">
-              <div>
-                <Label htmlFor="totalLength" className="text-base font-semibold">
-                  Total Length <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="totalLength"
-                  value={totalLength}
-                  onChange={(e) => setTotalLength(e.target.value)}
-                  placeholder={'96" or 8\' or 48 1/2"'}
-                  className="font-mono text-lg mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="numSections" className="text-base font-semibold">
-                  Number of Sections <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="numSections"
-                  type="number"
-                  value={numSections}
-                  onChange={(e) => setNumSections(e.target.value)}
-                  placeholder="4"
-                  className="text-lg mt-1"
-                  min="1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="divideOffset" className="text-sm">
-                  Starting Offset (optional)
-                </Label>
-                <Input
-                  id="divideOffset"
-                  value={divideOffset}
-                  onChange={(e) => setDivideOffset(e.target.value)}
-                  placeholder='4" (optional)'
-                  className="font-mono mt-1"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Exact Count Mode */}
-          {mode === "exact" && (
-            <div className="space-y-4 mb-6">
-              <div>
-                <Label htmlFor="exactBoardLength" className="text-base font-semibold">
-                  Board Length <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="exactBoardLength"
-                  value={exactBoardLength}
-                  onChange={(e) => setExactBoardLength(e.target.value)}
-                  placeholder={'30 3/8" or 96" or 8\''}
-                  className="font-mono text-lg mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="exactOffset" className="text-base font-semibold">
-                  Edge Offset <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="exactOffset"
-                  value={exactOffset}
-                  onChange={(e) => setExactOffset(e.target.value)}
-                  placeholder='4" (offset from both edges)'
-                  className="font-mono text-lg mt-1"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Distance from each edge to first/last screw
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="exactNumScrews" className="text-base font-semibold">
-                  Number of Screws <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="exactNumScrews"
-                  type="number"
-                  value={exactNumScrews}
-                  onChange={(e) => setExactNumScrews(e.target.value)}
-                  placeholder="5"
-                  className="text-lg mt-1"
-                  min="2"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Clear Button */}
           <div className="mb-6">
             <Button onClick={clearAll} variant="outline" className="w-full">
               Clear All
             </Button>
           </div>
 
-          {/* Results Summary */}
+          {summary.hasWarning && (
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-600 dark:text-amber-500">
+                {summary.warningMessage}
+              </p>
+            </div>
+          )}
+
           {marks.length > 0 && (
             <>
               <Card className="p-4 bg-primary/5 border-primary/20 mb-4">
@@ -511,74 +209,27 @@ export default function Intervals() {
                 </h3>
                 <div className="space-y-1.5 text-sm">
                   <p className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {mode === "fastener" ? "Fasteners:" : mode === "exact" ? "Screws:" : "Cut marks:"}
-                    </span>
+                    <span className="text-muted-foreground">Items:</span>
                     <span className="font-semibold">{summary.count}</span>
                   </p>
-                  {mode === "fastener" ? (
-                    <>
-                      <p className="flex justify-between">
-                        <span className="text-muted-foreground">Actual spacing:</span>
-                        <span className="font-semibold font-mono">
-                          {formatImperialMeasurement(toImperialMeasurement(summary.actualSpacing))}
-                        </span>
-                      </p>
-                      <p className="flex justify-between">
-                        <span className="text-muted-foreground">Span:</span>
-                        <span className="font-semibold font-mono">
-                          {formatImperialMeasurement(toImperialMeasurement(summary.span))}
-                        </span>
-                      </p>
-                      {summary.unusedLength > 0 && (
-                        <p className="flex justify-between text-amber-600 dark:text-amber-500">
-                          <span>Unused at end:</span>
-                          <span className="font-semibold font-mono">
-                            {formatImperialMeasurement(toImperialMeasurement(summary.unusedLength))}
-                          </span>
-                        </p>
-                      )}
-                    </>
-                  ) : mode === "exact" ? (
-                    <>
-                      <p className="flex justify-between">
-                        <span className="text-muted-foreground">Calculated spacing:</span>
-                        <span className="font-semibold font-mono">
-                          {formatImperialMeasurement(toImperialMeasurement(summary.actualSpacing))}
-                        </span>
-                      </p>
-                      <p className="flex justify-between">
-                        <span className="text-muted-foreground">Span:</span>
-                        <span className="font-semibold font-mono">
-                          {formatImperialMeasurement(toImperialMeasurement(summary.span))}
-                        </span>
-                      </p>
-                    </>
-                  ) : (
-                    <p className="flex justify-between">
-                      <span className="text-muted-foreground">Section size:</span>
-                      <span className="font-semibold font-mono">
-                        {formatImperialMeasurement(toImperialMeasurement(summary.actualSpacing))}
-                      </span>
-                    </p>
-                  )}
+                  <p className="flex justify-between">
+                    <span className="text-muted-foreground">Spacing between items:</span>
+                    <span className="font-semibold font-mono">
+                      {formatImperialMeasurement(toImperialMeasurement(summary.spacing))}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-muted-foreground">Span between first and last:</span>
+                    <span className="font-semibold font-mono">
+                      {formatImperialMeasurement(toImperialMeasurement(summary.span))}
+                    </span>
+                  </p>
                 </div>
               </Card>
 
-              {/* Warning */}
-              {summary.hasWarning && (
-                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-amber-600 dark:text-amber-500">
-                    {summary.warningMessage}
-                  </p>
-                </div>
-              )}
-
-              {/* Mark Positions */}
               <Card className="p-4 bg-muted/50">
                 <h3 className="font-semibold mb-3 text-sm text-muted-foreground">
-                  {mode === "fastener" ? "Fastener Positions:" : mode === "exact" ? "Screw Positions:" : "Cut Mark Positions:"}
+                  Mark Positions:
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {marks.map((mark, index) => (
@@ -596,37 +247,15 @@ export default function Intervals() {
             </>
           )}
 
-          {/* Instructions */}
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {mode === "fastener" ? (
-                <>
-                  <strong className="text-foreground">Fastener Spacing:</strong> Mark positions for screws or nails at regular intervals.
-                  Enter your desired spacing and board length. Offsets add clearance from edges (typically 1").
-                  <br />
-                  <span className="text-muted-foreground/70">
-                    Example: 8" spacing on 96" board with 1" offsets = 12 fasteners from 1" to 89"
-                  </span>
-                </>
-              ) : mode === "exact" ? (
-                <>
-                  <strong className="text-foreground">Exact Count:</strong> Place a specific number of screws evenly spaced on a board.
-                  Enter board length, edge offset, and number of screws. The calculator will determine the spacing.
-                  <br />
-                  <span className="text-muted-foreground/70">
-                    Example: 30 3/8" board, 4" offset, 5 screws = screws at 4", 9 9/16", 15 1/8", 20 11/16", 26 3/8"
-                  </span>
-                </>
-              ) : (
-                <>
-                  <strong className="text-foreground">Divide Evenly:</strong> Split a length into equal sections.
-                  Enter total length and number of sections needed. Marks show where to cut.
-                  <br />
-                  <span className="text-muted-foreground/70">
-                    Example: 96" ÷ 4 sections = cut marks at 24", 48", 72"
-                  </span>
-                </>
-              )}
+              <strong className="text-foreground">Even Spacing:</strong> Enter the total length,
+              the distance from each end, and how many items you need. The calculator shows every
+              mark position from the left edge.
+              <br />
+              <span className="text-muted-foreground/70">
+                Example: 30 3/8" length, 2" from each end, 5 items = marks at 2", 8 5/8", 15 3/16", 21 13/16", 28 3/8".
+              </span>
             </p>
           </div>
         </Card>

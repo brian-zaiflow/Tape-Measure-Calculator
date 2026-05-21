@@ -144,12 +144,10 @@ export default function Calculator() {
   };
 
   // Helper to ensure input ends with " (auto-assume inches)
-  // Exception: don't add " if using feet notation (ends with ')
   const ensureInchMark = (input: string): string => {
     const trimmed = input.trim();
     if (!trimmed) return trimmed;
     if (trimmed.endsWith('"')) return trimmed;
-    if (trimmed.endsWith("'")) return trimmed; // Feet-only notation like "5'"
     return trimmed + '"';
   };
 
@@ -259,9 +257,9 @@ export default function Calculator() {
     }
   };
 
-  // Show " at the end of user input (unless it ends with ' for feet notation)
+  // Show " at the end of user input
   const currentDisplay = state.currentInput
-    ? (state.currentInput.endsWith("'") ? state.currentInput : state.currentInput + '"')
+    ? state.currentInput + '"'
     : state.displayValue;
   const showOperation = state.operation !== 'none' && state.previousValue;
 
@@ -297,7 +295,7 @@ export default function Calculator() {
               <Link href="/intervals">
                 <Button variant="ghost" size="sm" className="h-8 px-2">
                   <Ruler className="w-4 h-4 mr-1" />
-                  <span className="text-xs">Intervals</span>
+                  <span className="text-xs">Spacing</span>
                 </Button>
               </Link>
             </div>
@@ -388,7 +386,7 @@ export default function Calculator() {
 
           {/* Calculator Grid */}
           <div className="grid grid-cols-4 gap-1.5">
-            {/* First Row: Clear, Delete, Feet mark, and Divide */}
+            {/* First Row: Clear, Delete, Space, and Divide */}
             <Button
               variant="destructive"
               onClick={handleClear}
@@ -407,11 +405,11 @@ export default function Calculator() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => handleSymbolClick("'")}
-              className="min-h-14 text-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
-              data-testid="button-feet"
+              onClick={() => handleSymbolClick(' ')}
+              className="min-h-14 text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+              data-testid="button-space"
             >
-              '
+              Space
             </Button>
             <Button
               variant={state.operation === 'divide' ? 'default' : 'secondary'}
@@ -522,11 +520,11 @@ export default function Calculator() {
               <Plus className="w-5 h-5" />
             </Button>
 
-            {/* Last row: 0, ., /, Space */}
+            {/* Last row: 0, ., / */}
             <Button
               variant="outline"
               onClick={() => handleNumberClick('0')}
-              className="min-h-14 text-xl font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200 active:scale-95"
+              className="min-h-14 text-xl font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200 active:scale-95 col-span-2"
               data-testid="button-0"
             >
               0
@@ -547,14 +545,7 @@ export default function Calculator() {
             >
               /
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => handleSymbolClick(' ')}
-              className="min-h-14 text-sm font-semibold"
-              data-testid="button-space"
-            >
-              Space
-            </Button>
+
           </div>
 
           {/* Second Grid - Equals Button */}

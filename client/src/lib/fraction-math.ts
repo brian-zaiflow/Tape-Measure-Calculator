@@ -119,59 +119,12 @@ export function formatAsDecimal(measurement: ImperialMeasurement): string {
 }
 
 // Parse input string to imperial measurement (inches and fractions only)
-// Also supports feet notation for convenience (converts to inches)
 export function parseInput(input: string): ImperialMeasurement | null {
   if (!input.trim()) return null;
 
   const cleaned = input.replace(/\s+/g, ' ').trim();
 
-  // Pattern 1: feet + inches + fraction (e.g., "5' 3 1/2"")
-  const feetInchFractionMatch = cleaned.match(/^(\d+)'\s*(\d+)\s+(\d+)\/(\d+)"$/);
-  if (feetInchFractionMatch) {
-    const feet = parseInt(feetInchFractionMatch[1]);
-    const inchPart = parseInt(feetInchFractionMatch[2]);
-    const numerator = parseInt(feetInchFractionMatch[3]);
-    const denominator = parseInt(feetInchFractionMatch[4]);
-
-    if (denominator !== 0) {
-      const reduced = reduceFraction(numerator, denominator);
-      const totalInches = feet * 12 + inchPart;
-      return { inches: totalInches, numerator: reduced.numerator, denominator: reduced.denominator };
-    }
-  }
-
-  // Pattern 2: feet + inches (e.g., "5' 3"")
-  const feetInchMatch = cleaned.match(/^(\d+)'\s*(\d+)"$/);
-  if (feetInchMatch) {
-    const feet = parseInt(feetInchMatch[1]);
-    const inchPart = parseInt(feetInchMatch[2]);
-    const totalInches = feet * 12 + inchPart;
-    return { inches: totalInches, numerator: 0, denominator: 1 };
-  }
-
-  // Pattern 3: feet + fraction (e.g., "5' 1/2"")
-  const feetFractionMatch = cleaned.match(/^(\d+)'\s*(\d+)\/(\d+)"$/);
-  if (feetFractionMatch) {
-    const feet = parseInt(feetFractionMatch[1]);
-    const numerator = parseInt(feetFractionMatch[2]);
-    const denominator = parseInt(feetFractionMatch[3]);
-
-    if (denominator !== 0) {
-      const reduced = reduceFraction(numerator, denominator);
-      const totalInches = feet * 12;
-      return { inches: totalInches, numerator: reduced.numerator, denominator: reduced.denominator };
-    }
-  }
-
-  // Pattern 4: feet only (e.g., "5'")
-  const feetOnlyMatch = cleaned.match(/^(\d+)'$/);
-  if (feetOnlyMatch) {
-    const feet = parseInt(feetOnlyMatch[1]);
-    const totalInches = feet * 12;
-    return { inches: totalInches, numerator: 0, denominator: 1 };
-  }
-
-  // Pattern 5: whole inches with fraction (e.g., "2 1/2"")
+  // Pattern 1: whole inches with fraction (e.g., "2 1/2"")
   const wholeWithFractionMatch = cleaned.match(/^(\d+)\s+(\d+)\/(\d+)"$/);
   if (wholeWithFractionMatch) {
     const inches = parseInt(wholeWithFractionMatch[1]);
@@ -184,7 +137,7 @@ export function parseInput(input: string): ImperialMeasurement | null {
     }
   }
 
-  // Pattern 6: just fraction (e.g., "1/2"")
+  // Pattern 2: just fraction (e.g., "1/2"")
   const fractionOnlyMatch = cleaned.match(/^(\d+)\/(\d+)"$/);
   if (fractionOnlyMatch) {
     const numerator = parseInt(fractionOnlyMatch[1]);
@@ -196,14 +149,14 @@ export function parseInput(input: string): ImperialMeasurement | null {
     }
   }
 
-  // Pattern 7: whole inches only (e.g., "2"")
+  // Pattern 3: whole inches only (e.g., "2"")
   const wholeOnlyMatch = cleaned.match(/^(\d+)"$/);
   if (wholeOnlyMatch) {
     const inches = parseInt(wholeOnlyMatch[1]);
     return { inches, numerator: 0, denominator: 1 };
   }
 
-  // Pattern 8: decimal with quote (e.g., "5.625"")
+  // Pattern 4: decimal with quote (e.g., "5.625"")
   const decimalWithQuoteMatch = cleaned.match(/^(\d+\.?\d*)"$/);
   if (decimalWithQuoteMatch) {
     const decimalValue = parseFloat(decimalWithQuoteMatch[1]);
@@ -214,7 +167,7 @@ export function parseInput(input: string): ImperialMeasurement | null {
     }
   }
 
-  // Pattern 9: plain decimal without quote (e.g., "5.625")
+  // Pattern 5: plain decimal without quote (e.g., "5.625")
   const plainDecimalMatch = cleaned.match(/^(\d+\.\d+)$/);
   if (plainDecimalMatch) {
     const decimalValue = parseFloat(plainDecimalMatch[1]);
@@ -223,7 +176,7 @@ export function parseInput(input: string): ImperialMeasurement | null {
     }
   }
 
-  // Pattern 10: plain whole number without quote (e.g., "2")
+  // Pattern 6: plain whole number without quote (e.g., "2")
   const plainNumberMatch = cleaned.match(/^(\d+)$/);
   if (plainNumberMatch) {
     const inches = parseInt(plainNumberMatch[1]);

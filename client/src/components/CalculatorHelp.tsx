@@ -31,7 +31,7 @@ export function CalculatorHelp() {
           <div>
             <h3 className="font-semibold mb-2">Basic Calculator</h3>
             <p className="text-muted-foreground">
-              Enter measurements and use +, −, ×, ÷ to calculate. The <strong>"</strong> mark is always added automatically.
+              Enter inch measurements and use +, −, ×, ÷ to calculate. The <strong>"</strong> mark is always added automatically.
             </p>
           </div>
 
@@ -49,15 +49,7 @@ export function CalculatorHelp() {
           <div>
             <h3 className="font-semibold mb-2">Decimal to Fraction</h3>
             <p className="text-muted-foreground">
-              Type a decimal value like <code>5.625</code> and press <strong>=</strong> to convert to <strong>5 5/8"</strong>. Great for converting measurements from digital tools!
-            </p>
-          </div>
-
-          {/* Feet Notation */}
-          <div>
-            <h3 className="font-semibold mb-2">Feet Notation</h3>
-            <p className="text-muted-foreground">
-              Type <code>5' 3 1/2</code> for 5 feet 3½ inches. Use the <strong>'</strong> button for the foot mark. Results always show in inches.
+              Type a decimal inch value like <code>5.625</code> and press <strong>=</strong> to convert to <strong>5 5/8"</strong>. Great for converting measurements from digital tools!
             </p>
           </div>
 
@@ -84,7 +76,6 @@ export function CalculatorHelp() {
             <ul className="list-none text-muted-foreground space-y-1 text-xs font-mono">
               <li>• 5 3/4 + 2 1/8 = 7 7/8"</li>
               <li>• 10.5 = 10 1/2"</li>
-              <li>• 5' 3 = 63"</li>
               <li>• 12 × 3/4 = 9"</li>
             </ul>
           </div>
